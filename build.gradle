@@ -1,0 +1,24 @@
+apply plugin: 'java'
+apply plugin: 'application'
+
+group 'com.cs-pum.uncertain_mlc'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = 1.8
+
+mainClassName = "com.cs_pum.uncertain_mlc.examples.UHLExperiment"
+
+repositories {
+    mavenCentral()
+
+    flatDir {
+        dirs 'local_deps'
+    }
+}
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+
+    compile files("local_deps/mulan.jar")
+    compile files("local_deps/mlc_pcc_examples.jar")
+}
