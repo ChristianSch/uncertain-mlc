@@ -44,20 +44,7 @@ public class LabelSpaceReduction {
         int numFeatures = instances.getFeatureAttributes().size();
 
         LabelsMetaDataImpl labelsData = new LabelsMetaDataImpl();
-
-        int[] keepLabels = instances.getLabelIndices();
-        int[] counts = new int[numLabels];
-
-        // calculate number of occurrences of a label
-        for (int i = 0; i < numLabels; i++) {
-            double[] labels = data.get(i).toDoubleArray();
-            counts[i] = 0;
-
-            for (int j = numFeatures; j < numFeatures + numLabels; j++) {
-                if (labels[j] >= 0.5) {
-                    counts[i] += 1;
-                }
-            }
+        int[] counts = LabelMetadata.getLabelCounts(instances, labelsFirst);
         }
 
         int bound = 0;
