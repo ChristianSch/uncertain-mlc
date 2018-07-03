@@ -30,21 +30,36 @@ public class LabelSpaceReduction {
      *
      * @param instances the data set
      * @param numLabelsToKeep number of labels to retain
+     * @param labelsFirst indicates if labels or attributes are at the start of the data section
+     *                    (mulan datasets should have "false", meka data sets should have "true")
      * @return data set with reduced number of labels
      * @throws InvalidDataFormatException
      */
-    public static MultiLabelInstances reduceLabelSpace(MultiLabelInstances instances, int numLabelsToKeep) throws InvalidDataFormatException {
+    public static MultiLabelInstances reduceLabelSpace(MultiLabelInstances instances, int numLabelsToKeep, boolean labelsFirst) throws InvalidDataFormatException {
         if (instances.getNumLabels() <= numLabelsToKeep) {
             return instances;
         }
 
         Instances data = instances.getDataSet();
+        LabelsMetaDataImpl labelsData = new LabelsMetaDataImpl();
         int numLabels = instances.getNumLabels();
         int numInstances = instances.getNumInstances();
         int numFeatures = instances.getFeatureAttributes().size();
-
-        LabelsMetaDataImpl labelsData = new LabelsMetaDataImpl();
+        boolean[] keepLabels = new boolean[numLabels];
         int[] counts = LabelMetadata.getLabelCounts(instances, labelsFirst);
+
+        // start and end of label/feature regions in the data are set dynamically
+        // to reduce boilerplate code further down. offsets hence refer to different regions
+        // depending on the data type (meka/mulan).
+        int featureStart;
+        int labelStart;
+
+        if (labelsFirst) {
+            featureStart = numLabels;
+            labelStart = 0;
+        } else {
+            featureStart = 0;
+            labelStart = numFeatures;
         }
 
         int bound = 0;
@@ -68,18 +83,29 @@ public class LabelSpaceReduction {
             }
         }
 
+        for (int i = 0; i < numLabels; i++) {
+            if (counts[i] > bound) {
+                keepLabels[i] = true;
+            } else {
+                keepLabels[i] = false;
+            }
+        }
+
         ArrayList<Attribute> attrs = new ArrayList<>();
 
-        // build label meta data
         for (int i = 0; i < numFeatures + numLabelsToKeep; i++) {
             Attribute attr = data.attribute(i).copy(data.attribute(i).name());
 
-            if (i >= numFeatures) {
+            if (!labelsFirst && i >= numFeatures && keepLabels[i - numFeatures]) {
+                labelsData.addRootNode(new LabelNodeImpl(attr.name()));
+            } else if (labelsFirst && i < numLabels && keepLabels[i]) {
                 labelsData.addRootNode(new LabelNodeImpl(attr.name()));
             }
 
             attrs.add(attr);
         }
+
+        System.out.println(labelsData.getLabelNames());
 
         Instances insts = new Instances(data.relationName(), attrs, numInstances);
 
@@ -88,17 +114,22 @@ public class LabelSpaceReduction {
             DenseInstance filteredInstance = new DenseInstance(numFeatures + numLabelsToKeep);
 
             // copy features
-            for (int n = 0; n < numFeatures; n++) {
-                filteredInstance.setValue(n, inst.value(n));
-                filteredInstance.setDataset(insts);
+            for (int j = featureStart; j < numFeatures; j++) {
+                filteredInstance.setValue(featureStart, inst.value(j));
             }
+
+            int offset = 0;
 
             // copy filtered labels
-            for (int j = 0; j < numLabelsToKeep; j++) {
-                filteredInstance.setValue(j + numFeatures, inst.value(keepLabels[j]));
-                filteredInstance.setDataset(insts);
+            for (int k = labelStart; k < numLabels; k++) {
+                if (keepLabels[k]) {
+                    filteredInstance.setValue(k - offset, inst.value(k));
+                } else {
+                    offset++;
+                }
             }
 
+            filteredInstance.setDataset(insts);
             insts.add(filteredInstance);
         }
 
