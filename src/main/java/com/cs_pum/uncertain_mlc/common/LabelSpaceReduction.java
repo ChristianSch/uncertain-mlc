@@ -93,7 +93,7 @@ public class LabelSpaceReduction {
 
         ArrayList<Attribute> attrs = new ArrayList<>();
 
-        for (int i = 0; i < numFeatures + numLabelsToKeep; i++) {
+        for (int i = 0; i < numFeatures + numLabels; i++) {
             Attribute attr = data.attribute(i).copy(data.attribute(i).name());
 
             if (!labelsFirst && i >= numFeatures && keepLabels[i - numFeatures]) {
