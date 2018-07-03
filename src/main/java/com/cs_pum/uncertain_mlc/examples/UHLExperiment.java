@@ -4,6 +4,7 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import com.cs_pum.uncertain_mlc.common.LabelMetadata;
 import com.cs_pum.uncertain_mlc.common.LabelSpaceReduction;
 import com.cs_pum.uncertain_mlc.losses.UncertainHammingLoss;
 
@@ -43,8 +44,6 @@ public class UHLExperiment extends Experiment {
 
     public UHLExperiment() {
         String[] datasets = {
-
-                "SLASHDOT-F",
                 "emotions",
                 "enron",
                 "mediamill",
@@ -53,6 +52,7 @@ public class UHLExperiment extends Experiment {
                 "tmc2007-500",
                 "yeast",
                 "IMDB-F",
+                "SLASHDOT-F",
                 "OHSUMED-F",
                 "REUTERS-K500-EX2"
         };
@@ -232,24 +232,25 @@ public class UHLExperiment extends Experiment {
             FileInputStream fileStream = null;
             File arffFile = new File("datasets/" + dataset + ".arff");
             fileStream = new FileInputStream(arffFile);
-
-            if ((boolean) this.labelsFirst.get(dataset)) {
-                System.out.println("labelsFirst");
-            }
+            boolean labelsFirst = (boolean) this.labelsFirst.get(dataset);
 
             data = new MultiLabelInstances((InputStream) fileStream,
                     (int) this.labelCounts.get(dataset),
-                    (boolean) this.labelsFirst.get(dataset));
+                    labelsFirst);
 
             System.out.println(data.getLabelsMetaData().getLabelNames());
             System.out.println(Utils.arrayToString(data.getDataSet().get(0).toDoubleArray()));
 
-            /*
+            System.out.println("label frequencies:");
+            System.out.println(Utils.arrayToString(LabelMetadata.getLabelFrequencies(data, labelsFirst)));
+
             if (data.getNumLabels() > 10) {
                 System.out.println("reduced labels to 10");
-                data = LabelSpaceReduction.reduceLabelSpace(data, 10);
+                data = LabelSpaceReduction.reduceLabelSpace(data, 10, labelsFirst);
+
+                System.out.println("label frequencies (10 labels):");
+                System.out.println(Utils.arrayToString(LabelMetadata.getLabelFrequencies(data, labelsFirst)));
             }
-            */
 
             this.initMeasures(data.getNumLabels());
             System.out.println("labels:");
