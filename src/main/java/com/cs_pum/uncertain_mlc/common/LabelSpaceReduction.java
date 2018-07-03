@@ -7,10 +7,7 @@ import mulan.data.LabelNodeImpl;
 import mulan.data.LabelsMetaDataImpl;
 import mulan.data.MultiLabelInstances;
 
-import weka.core.Attribute;
-import weka.core.Instance;
-import weka.core.Instances;
-import weka.core.DenseInstance;
+import weka.core.*;
 
 
 /**
@@ -84,13 +81,14 @@ public class LabelSpaceReduction {
         }
 
         for (int i = 0; i < numLabels; i++) {
-            if (counts[i] > bound) {
+            if (counts[i] >= bound) {
                 keepLabels[i] = true;
             } else {
                 keepLabels[i] = false;
             }
         }
 
+        // set up attribute meta data
         ArrayList<Attribute> attrs = new ArrayList<>();
 
         for (int i = 0; i < numFeatures + numLabels; i++) {
@@ -98,15 +96,19 @@ public class LabelSpaceReduction {
 
             if (!labelsFirst && i >= numFeatures && keepLabels[i - numFeatures]) {
                 labelsData.addRootNode(new LabelNodeImpl(attr.name()));
+                attrs.add(attr);
             } else if (labelsFirst && i < numLabels && keepLabels[i]) {
                 labelsData.addRootNode(new LabelNodeImpl(attr.name()));
+                attrs.add(attr);
             }
 
-            attrs.add(attr);
+            // add regular features
+            if (!labelsFirst && i < numFeatures || labelsFirst && i >= numLabels) {
+                attrs.add(attr);
+            }
         }
 
-        System.out.println(labelsData.getLabelNames());
-
+        // set up instances
         Instances insts = new Instances(data.relationName(), attrs, numInstances);
 
         for (int i = 0; i < numInstances; i++) {
@@ -118,14 +120,13 @@ public class LabelSpaceReduction {
                 filteredInstance.setValue(featureStart, inst.value(j));
             }
 
-            int offset = 0;
+            int labelIndex = labelStart;
 
             // copy filtered labels
-            for (int k = labelStart; k < numLabels; k++) {
+            for (int k = 0; k < numLabels; k++) {
                 if (keepLabels[k]) {
-                    filteredInstance.setValue(k - offset, inst.value(k));
-                } else {
-                    offset++;
+                    filteredInstance.setValue(labelIndex, inst.value(k + labelStart));
+                    labelIndex++;
                 }
             }
 
