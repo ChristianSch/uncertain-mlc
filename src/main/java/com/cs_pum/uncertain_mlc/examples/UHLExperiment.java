@@ -239,8 +239,6 @@ public class UHLExperiment extends Experiment {
                     labelsFirst);
 
             System.out.println(data.getLabelsMetaData().getLabelNames());
-            System.out.println(Utils.arrayToString(data.getDataSet().get(0).toDoubleArray()));
-
             System.out.println("label frequencies:");
             System.out.println(Utils.arrayToString(LabelMetadata.getLabelFrequencies(data, labelsFirst)));
 
