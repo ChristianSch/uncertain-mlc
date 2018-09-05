@@ -117,7 +117,7 @@ public class LabelSpaceReduction {
 
             // copy features
             for (int j = featureStart; j < numFeatures; j++) {
-                filteredInstance.setValue(featureStart, inst.value(j));
+                filteredInstance.setValue(j, inst.value(j));
             }
 
             int labelIndex = labelStart;
