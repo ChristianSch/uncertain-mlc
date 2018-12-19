@@ -100,7 +100,7 @@ public class UncertainHammingLoss implements MultiLabelLossFunction, Measure {
         double[] probabilities = prediction.getConfidences();
         boolean[] bipartition = prediction.getBipartition();
         double symmetricDifference = 0;
-        int u = 0;
+        double u = 0;
 
         for (int i = 0; i < groundTruth.length; i++) {
             if (probabilities[i] < tao || probabilities[i] > (1 - tao)) {
