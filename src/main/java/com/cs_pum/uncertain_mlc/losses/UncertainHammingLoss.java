@@ -2,7 +2,6 @@ package com.cs_pum.uncertain_mlc.losses;
 
 import mulan.classifier.MultiLabelOutput;
 import mulan.evaluation.GroundTruth;
-import mulan.evaluation.loss.MultiLabelLossFunction;
 import mulan.evaluation.measure.Measure;
 
 
@@ -19,11 +18,12 @@ import mulan.evaluation.measure.Measure;
  * @author Christian Schulze
  * @since  2018-06-25
  */
-public class UncertainHammingLoss implements MultiLabelLossFunction, Measure {
+public class UncertainHammingLoss implements UncertainLoss {
     private double tao = 1./3;
     private double omega = 1.0;
     private double accum = 0;
     private double calls = 0;
+    private double uncertainty = 0.;
 
     public double getTao() {
         return tao;
@@ -66,13 +66,10 @@ public class UncertainHammingLoss implements MultiLabelLossFunction, Measure {
         return 0;
     }
 
+    public double getUncertainty() { return (this.uncertainty * this.omega) / this.calls; }
+
     public void update(MultiLabelOutput multiLabelOutput, GroundTruth groundTruth) {
         this.accum += this.computeLoss(multiLabelOutput, groundTruth.getTrueLabels());
-        this.calls++;
-    }
-
-    public void update(MultiLabelOutput multiLabelOutput, boolean[] groundTruth) {
-        this.accum += this.computeLoss(multiLabelOutput, groundTruth);
         this.calls++;
     }
 
@@ -109,6 +106,7 @@ public class UncertainHammingLoss implements MultiLabelLossFunction, Measure {
                 }
             } else {
                 u += this.omega;
+                this.uncertainty += 1. / groundTruth.length;
             }
         }
 
