@@ -30,16 +30,22 @@ public class UncertainHammingLoss implements MultiLabelLossFunction, Measure {
     }
 
     public void setTao(double tao) {
-        // FIXME: throw exception when > 1
+        if (tao <= 0 || tao >= .5) {
+            throw new IllegalArgumentException("Tao needs to be > 0. and < 0.5");
+        }
+
         this.tao = tao;
     }
 
     public double getOmega() {
-        // FIXME: print warning when > 1
         return omega;
     }
 
     public void setOmega(double omega) {
+        if (omega <= 0. || omega > 1.0) {
+            throw new IllegalArgumentException("Omega needs to be > 0. and <= 1.0");
+        }
+
         this.omega = omega;
     }
 
