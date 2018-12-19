@@ -68,6 +68,11 @@ public class UncertainHammingLoss implements UncertainLoss {
 
     public double getUncertainty() { return (this.uncertainty * this.omega) / this.calls; }
 
+    @Override
+    public double getNoUncertain() {
+        return this.uncertainty;
+    }
+    
     public void update(MultiLabelOutput multiLabelOutput, GroundTruth groundTruth) {
         this.accum += this.computeLoss(multiLabelOutput, groundTruth.getTrueLabels());
         this.calls++;
