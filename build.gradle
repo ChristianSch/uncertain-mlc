@@ -21,6 +21,7 @@ dependencies {
 
     compile files("local_deps/mulan.jar")
     compile files("local_deps/mlc_pcc_examples.jar")
+    compile group: 'com.opencsv', name: 'opencsv', version: '4.1'
 }
 
 tasks.withType(JavaExec) {
