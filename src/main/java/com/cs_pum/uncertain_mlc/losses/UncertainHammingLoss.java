@@ -24,6 +24,7 @@ public class UncertainHammingLoss implements UncertainLoss {
     private double accum = 0;
     private double calls = 0;
     private double uncertainty = 0.;
+    private double labelSize = 0;
 
     public double getTao() {
         return tao;
@@ -66,14 +67,20 @@ public class UncertainHammingLoss implements UncertainLoss {
         return 0;
     }
 
-    public double getUncertainty() { return (this.uncertainty * this.omega) / this.calls; }
+    public double getUncertainty() {
+        return this.omega * (this.uncertainty / (this.calls * this.labelSize));
+    }
 
     @Override
     public double getNoUncertain() {
         return this.uncertainty;
     }
-    
+
     public void update(MultiLabelOutput multiLabelOutput, GroundTruth groundTruth) {
+        if (this.labelSize == 0) {
+            this.labelSize =  groundTruth.getTrueLabels().length;
+        }
+
         this.accum += this.computeLoss(multiLabelOutput, groundTruth.getTrueLabels());
         this.calls++;
     }
@@ -111,12 +118,13 @@ public class UncertainHammingLoss implements UncertainLoss {
                     symmetricDifference++;
                 }
             } else {
-                u += this.omega;
-                this.uncertainty += 1. / groundTruth.length;
+                u += 1;
             }
         }
 
-        return (symmetricDifference + u) / groundTruth.length;
+        this.uncertainty += u;
+
+        return (symmetricDifference + (u * this.omega)) / groundTruth.length;
     }
 
 }
