@@ -23,6 +23,6 @@ public interface UncertainLoss extends MultiLabelLossFunction, Measure {
      * Returns total count of uncertain labels
      * @return
      */
-    int getNoUncertain();
+    double getNoUncertain();
 
 }
