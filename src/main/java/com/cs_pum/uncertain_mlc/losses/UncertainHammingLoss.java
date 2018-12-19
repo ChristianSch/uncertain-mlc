@@ -102,7 +102,7 @@ public class UncertainHammingLoss implements MultiLabelLossFunction, Measure {
                     symmetricDifference++;
                 }
             } else {
-                u += 1;
+                u += this.omega;
             }
         }
 
