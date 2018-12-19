@@ -92,6 +92,7 @@ public class UncertainHammingLoss implements UncertainLoss {
     public void reset() {
         this.calls = 0;
         this.accum = 0;
+        this.uncertainty = 0;
     }
 
     public boolean handlesMissingValues() {
