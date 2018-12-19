@@ -1,16 +1,13 @@
-import com.cs_pum.uncertain_mlc.common.LabelMetadata;
 import com.cs_pum.uncertain_mlc.common.LabelSpaceReduction;
 import mulan.data.MultiLabelInstances;
 import org.junit.Before;
 import org.junit.Test;
-import weka.core.Utils;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.HashMap;
 
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 
 public class TestLabelSpaceReduction {
@@ -69,13 +66,13 @@ public class TestLabelSpaceReduction {
             data = new MultiLabelInstances("datasets/" + dataset + ".arff",
                     "datasets/" + dataset + ".xml");
             */
-            FileInputStream fileStream = null;
+            FileInputStream fileStream;
             File arffFile = new File("datasets/" + dataset + ".arff");
             fileStream = new FileInputStream(arffFile);
-            boolean labelsFirst = (boolean) this.labelsFirst.get(dataset);
+            boolean labelsFirst = this.labelsFirst.get(dataset);
 
-            data = new MultiLabelInstances((InputStream) fileStream,
-                    (int) this.labelCounts.get(dataset),
+            data = new MultiLabelInstances(fileStream,
+                    this.labelCounts.get(dataset),
                     labelsFirst);
 
             // TODO: get first and last instance, compare features

@@ -1,10 +1,9 @@
 package com.cs_pum.uncertain_mlc.losses;
 
-import mulan.classifier.MultiLabelOutput;
 import mulan.evaluation.loss.MultiLabelLossFunction;
 import mulan.evaluation.measure.Measure;
 
-public abstract interface UncertainLoss extends MultiLabelLossFunction, Measure {
+public interface UncertainLoss extends MultiLabelLossFunction, Measure {
 
     void setTao(double tao);
     void setOmega(double omega);

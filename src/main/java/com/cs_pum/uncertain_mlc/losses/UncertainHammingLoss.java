@@ -73,7 +73,7 @@ public class UncertainHammingLoss implements UncertainLoss {
         this.calls++;
     }
 
-    public Measure makeCopy() throws Exception {
+    public Measure makeCopy() {
         UncertainHammingLoss uhl = new UncertainHammingLoss();
 
         uhl.setOmega(this.omega);

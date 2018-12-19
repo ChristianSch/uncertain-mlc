@@ -6,8 +6,6 @@ import com.opencsv.CSVReader;
 import mulan.classifier.MultiLabelOutput;
 import mulan.evaluation.GroundTruth;
 import mulan.evaluation.measure.HammingLoss;
-import mulan.evaluation.measure.Measure;
-import weka.core.Utils;
 
 import java.io.FileReader;
 import java.util.ArrayList;
@@ -24,48 +22,14 @@ import java.util.List;
 public class TaoOptimization {
 
     /**
-     * @param mlOutput
-     * @param measure
-     * @return
-     * @throws Exception
-     */
-    public static double evaluate(MultiLabelOutput mlOutput, Measure measure) throws Exception {
-        return evaluate(mlOutput.getConfidences(), measure);
-    }
-
-    /**
-     * NB: based on code from mulan.evaluation.Evaluator
-     *
-     * @param confidences
-     * @param measure
-     * @return
-     * @throws Exception
-     */
-    static double evaluate(double[] confidences, Measure measure) throws Exception {
-        if (measure == null) {
-            throw new IllegalArgumentException("Measure is null");
-        }
-
-
-        measure.reset();
-
-        //for(int instanceIndex = 0; instanceIndex < numInstances; ++instanceIndex) {
-        //measure.update(output, truth);
-        //}
-
-        return .0;
-    }
-
-
-    /**
      * This function tries to find an approximation of the optimal tao for a given loss/score function.
      *
-     * @parameter measure measure to be optimized. note that only one measure can be optimized at once. optimality of
+     * @param measure measure to be optimized. note that only one measure can be optimized at once. optimality of
      * tao w.r.t. to a measure does not imply optimality of tao w.r.t. to another measure
-     * @parameter minimize whether to minimize or maximize the given metric (loss functions are to be minimized,
+     * @param minimize whether to minimize or maximize the given metric (loss functions are to be minimized,
      * score functions to be maxmimized)
      *
-     * @returns approximately symmetric tao
+     * @return approximately symmetric tao
      */
     static double taoGridSearch(List<double[]> confidences, List<double[]> groundTruth, UncertainLoss measure, Boolean minimize) {
         double noCandidates = 30;
@@ -98,6 +62,7 @@ public class TaoOptimization {
             System.out.println(hl.toString());
         }
 
+        // FIXME: return tao for which measure is minimised
         return .0;
     }
 
@@ -165,7 +130,7 @@ public class TaoOptimization {
                 e.printStackTrace();
             }
 
-            taoGridSearch(confidences, groundTruth, new UncertainHammingLoss(), true);
+            double optTao = taoGridSearch(confidences, groundTruth, new UncertainHammingLoss(), true);
         }
     }
 }

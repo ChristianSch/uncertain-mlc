@@ -81,11 +81,7 @@ public class LabelSpaceReduction {
         }
 
         for (int i = 0; i < numLabels; i++) {
-            if (counts[i] >= bound) {
-                keepLabels[i] = true;
-            } else {
-                keepLabels[i] = false;
-            }
+            keepLabels[i] = counts[i] >= bound;
         }
 
         // set up attribute meta data

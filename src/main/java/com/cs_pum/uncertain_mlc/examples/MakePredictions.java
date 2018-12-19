@@ -18,7 +18,6 @@ import weka.filters.unsupervised.instance.Randomize;
 
 import java.io.*;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -113,9 +112,7 @@ public class MakePredictions extends Experiment  {
     private void writeCSV(String csv, String fileName) throws Exception {
         File file = new File(fileName);
 
-        if (!file.exists()) {
-            file.createNewFile();
-        }
+        assert file.exists() || file.createNewFile();
 
         BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(file));
         out.write(csv.getBytes());
@@ -138,13 +135,13 @@ public class MakePredictions extends Experiment  {
             int someFolds = 3;
 
             DecimalFormat formatter = new DecimalFormat("#.########");
-            FileInputStream fileStream = null;
+            FileInputStream fileStream;
             File arffFile = new File("datasets/" + dataset + ".arff");
             fileStream = new FileInputStream(arffFile);
-            boolean labelsFirst = (boolean) this.labelsFirst.get(dataset);
+            boolean labelsFirst = this.labelsFirst.get(dataset);
 
-            data = new MultiLabelInstances((InputStream) fileStream,
-                    (int) this.labelCounts.get(dataset),
+            data = new MultiLabelInstances(fileStream,
+                    this.labelCounts.get(dataset),
                     labelsFirst);
 
             if (data.getNumLabels() > 10) {
@@ -165,9 +162,9 @@ public class MakePredictions extends Experiment  {
             System.out.println("label counts:");
             System.out.println(Utils.arrayToString(LabelMetadata.getLabelCounts(data, labelsFirst)));
 
-            String out = String.join(",",
+            StringBuilder out = new StringBuilder(String.join(",",
                     this.prependStringArr(labelNames, "pred_")) + ",fold,"
-                    + String.join(",", data.getLabelsMetaData().getLabelNames()) + '\n';
+                    + String.join(",", data.getLabelsMetaData().getLabelNames()) + '\n');
 
             for(int i = 0; i < someFolds; ++i) {
                 try {
@@ -178,7 +175,7 @@ public class MakePredictions extends Experiment  {
                     Instances test = workingSet.testCV(someFolds, i);
 
                     MultiLabelInstances mlTrain = new MultiLabelInstances(train, data.getLabelsMetaData());
-                    MultiLabelInstances mlTest = new MultiLabelInstances(test, data.getLabelsMetaData());
+                    // MultiLabelInstances mlTest = new MultiLabelInstances(test, data.getLabelsMetaData());
 
                     MultiLabelLearner clone = model.makeCopy();
                     clone.build(mlTrain);
@@ -199,34 +196,34 @@ public class MakePredictions extends Experiment  {
 
                         for (double confidence : confidences) {
                             // predicted labels (probability y_i = 1)
-                            out += formatter.format(confidence) + ',';
+                            out.append(formatter.format(confidence)).append(',');
                         }
 
                         // #fold
-                        out += (new Integer(i)).toString() + ',';
+                        out.append((new Integer(i)).toString()).append(',');
 
                         // ground truth
                         for (int k = 0; k < numLabels; k++) {
                             if (labelsFirst) {
-                                out += inst[k];
-                            } else if (!labelsFirst) {
-                                out += inst[k + numFeatures];
+                                out.append(inst[k]);
+                            } else {
+                                out.append(inst[k + numFeatures]);
                             }
 
                             if (k < (numLabels - 1)) {
-                                out += ",";
+                                out.append(",");
                            }
                         }
 
-                        out += '\n';
+                        out.append('\n');
                     }
 
                 } catch (Exception var14) {
-                    Logger.getLogger(Evaluator.class.getName()).log(Level.SEVERE, (String) null, var14);
+                    Logger.getLogger(Evaluator.class.getName()).log(Level.SEVERE, null, var14);
                 }
 
                 /* save confidences of predictions (probabilistic predictions) to csv */
-                this.writeCSV(out, "results/predictions-" + dataset + ".csv");
+                this.writeCSV(out.toString(), "results/predictions-" + dataset + ".csv");
 
             }
         }

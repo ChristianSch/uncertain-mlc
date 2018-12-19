@@ -211,9 +211,7 @@ public class UHLExperiment extends Experiment {
     private void writeCSV(String csv, String fileName) throws Exception {
         File file = new File(fileName);
 
-        if (!file.exists()) {
-            file.createNewFile();
-        }
+        assert file.exists() || file.createNewFile();
 
         BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(file));
         out.write(csv.getBytes());
@@ -229,13 +227,13 @@ public class UHLExperiment extends Experiment {
             data = new MultiLabelInstances("datasets/" + dataset + ".arff",
                     "datasets/" + dataset + ".xml");
             */
-            FileInputStream fileStream = null;
+            FileInputStream fileStream;
             File arffFile = new File("datasets/" + dataset + ".arff");
             fileStream = new FileInputStream(arffFile);
-            boolean labelsFirst = (boolean) this.labelsFirst.get(dataset);
+            boolean labelsFirst = this.labelsFirst.get(dataset);
 
-            data = new MultiLabelInstances((InputStream) fileStream,
-                    (int) this.labelCounts.get(dataset),
+            data = new MultiLabelInstances(fileStream,
+                    this.labelCounts.get(dataset),
                     labelsFirst);
 
             System.out.println(data.getLabelsMetaData().getLabelNames());
