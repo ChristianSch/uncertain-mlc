@@ -25,4 +25,10 @@ public interface UncertainLoss extends MultiLabelLossFunction, Measure {
      */
     double getNoUncertain();
 
+    /**
+     * Returns ratio of uncertain labels.
+     * @return
+     */
+    double getUncertaintyRatio();
+
 }
