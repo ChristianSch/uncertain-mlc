@@ -5,10 +5,10 @@ import mulan.evaluation.measure.Measure;
 
 public interface UncertainLoss extends MultiLabelLossFunction, Measure {
 
-    void setTao(double tao);
+    void setTau(double tau);
     void setOmega(double omega);
 
-    double getTao();
+    double getTau();
     double getOmega();
 
     /**

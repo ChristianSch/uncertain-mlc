@@ -14,24 +14,24 @@ import java.util.List;
 
 
 /**
- * This experiment implements approximate optimization of the tao parameter of an extended loss, such as the extended
+ * This experiment implements approximate optimization of the tau parameter of an extended loss, such as the extended
  * hamming loss implementing uncertainty in its evaluation of predictions. This very experiment is implemented such that
- * predictions (in the form of confidences) are read from files (see examples.MakePredictions) and tao is (approximately)
+ * predictions (in the form of confidences) are read from files (see examples.MakePredictions) and tau is (approximately)
  * optimized for one set of confidences.
  */
-public class TaoOptimization {
+public class TauOptimization {
 
     /**
-     * This function tries to find an approximation of the optimal tao for a given loss/score function.
+     * This function tries to find an approximation of the optimal tau for a given loss/score function.
      *
      * @param measure measure to be optimized. note that only one measure can be optimized at once. optimality of
-     * tao w.r.t. to a measure does not imply optimality of tao w.r.t. to another measure
+     * tau w.r.t. to a measure does not imply optimality of tau w.r.t. to another measure
      * @param minimize whether to minimize or maximize the given metric (loss functions are to be minimized,
      * score functions to be maxmimized)
      *
-     * @return approximately symmetric tao
+     * @return approximately symmetric tau
      */
-    static double taoGridSearch(List<double[]> confidences, List<double[]> groundTruth, UncertainLoss measure, Boolean minimize) {
+    static double tauGridSearch(List<double[]> confidences, List<double[]> groundTruth, UncertainLoss measure, Boolean minimize) {
         double noCandidates = 30;
         double start = .0;
         double end = .49999999;
@@ -42,10 +42,10 @@ public class TaoOptimization {
         for (int i = 0; i < noCandidates; i++) {
             measure.reset();
             hl.reset();
-            double tao = start + ((i + 1) * step);
-            System.out.print("-> tao := ");
-            System.out.println(tao);
-            measure.setTao(tao);
+            double tau = start + ((i + 1) * step);
+            System.out.print("-> tau := ");
+            System.out.println(tau);
+            measure.setTau(tau);
             measure.setOmega(.5);
 
             for (int j = 0; j < confidences.size(); j++) {
@@ -62,7 +62,7 @@ public class TaoOptimization {
             System.out.println(hl.toString());
         }
 
-        // FIXME: return tao for which measure is minimised
+        // FIXME: return tau for which measure is minimised
         return .0;
     }
 
@@ -130,7 +130,7 @@ public class TaoOptimization {
                 e.printStackTrace();
             }
 
-            double optTao = taoGridSearch(confidences, groundTruth, new UncertainHammingLoss(), true);
+            double optTau = tauGridSearch(confidences, groundTruth, new UncertainHammingLoss(), true);
         }
     }
 }
