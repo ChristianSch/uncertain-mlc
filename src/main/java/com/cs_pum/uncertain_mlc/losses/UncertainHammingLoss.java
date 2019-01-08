@@ -23,8 +23,19 @@ public class UncertainHammingLoss implements UncertainLoss {
     private double omega = 1.0;
     private double accum = 0;
     private double calls = 0;
-    private double uncertainty = 0.;
+    private double uncertainty = 0;
     private double labelSize = 0;
+
+    public UncertainHammingLoss() {}
+
+    public UncertainHammingLoss(double tau) {
+        setTau(tau);
+    }
+
+    public UncertainHammingLoss(double tau, double omega) {
+        setOmega(omega);
+        setTau(tau);
+    }
 
     public double getTau() {
         return tau;
@@ -60,6 +71,10 @@ public class UncertainHammingLoss implements UncertainLoss {
     }
 
     public double getValue() {
+        if (this.calls == 0) {
+            new Exception("measure has not been fed with data yet");
+        }
+
         return this.accum / this.calls;
     }
 
@@ -90,6 +105,7 @@ public class UncertainHammingLoss implements UncertainLoss {
 
         uhl.setOmega(this.omega);
         uhl.setTau(this.tau);
+        // FIXME: exact copy or only of parameters?
         uhl.accum = this.accum;
         uhl.calls = this.calls;
 
@@ -113,7 +129,7 @@ public class UncertainHammingLoss implements UncertainLoss {
         double u = 0;
 
         for (int i = 0; i < groundTruth.length; i++) {
-            if (probabilities[i] < tau || probabilities[i] > (1 - tau)) {
+            if (probabilities[i] < this.tau || probabilities[i] > (1 - this.tau)) {
                 if (bipartition[i] != groundTruth[i]) {
                     symmetricDifference++;
                 }
