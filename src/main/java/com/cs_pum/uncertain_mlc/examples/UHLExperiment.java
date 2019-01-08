@@ -1,21 +1,32 @@
 package com.cs_pum.uncertain_mlc.examples;
 
 import java.io.*;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.cs_pum.uncertain_mlc.common.LabelMetadata;
 import com.cs_pum.uncertain_mlc.common.LabelSpaceReduction;
 import com.cs_pum.uncertain_mlc.losses.UncertainHammingLoss;
 
+import com.cs_pum.uncertain_mlc.losses.UncertainLoss;
+import mulan.classifier.MultiLabelLearner;
+import mulan.classifier.MultiLabelOutput;
 import mulan.data.InvalidDataFormatException;
 import mulan.data.MultiLabelInstances;
 import mulan.evaluation.Evaluator;
 import mulan.evaluation.Evaluation;
+import mulan.evaluation.GroundTruth;
 import mulan.evaluation.MultipleEvaluation;
 import mulan.evaluation.measure.HammingLoss;
 import mulan.evaluation.measure.Measure;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.math.stat.descriptive.moment.Mean;
+import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 import weka.classifiers.functions.Logistic;
 import weka.core.Instance;
 import weka.core.Instances;
@@ -90,7 +101,7 @@ public class UHLExperiment extends Experiment {
     public void initMeasures(int numOfLabels) {
         this.measures = new ArrayList<Measure>();
         this.measures.add(new HammingLoss());
-        this.measures.add(new UncertainHammingLoss());
+        this.measures.add(new UncertainHammingLoss(1./3, 1./2));
         this.measures.add(new ZeroOneLossMeasure());
         /*
         this.measures.add(new InstanceBasedFMeasure());
@@ -218,15 +229,22 @@ public class UHLExperiment extends Experiment {
         out.close();
     }
 
+    private String[] prependStringArr(String[] arr, String prefix) {
+        for (int i = 0; i < arr.length; i++) {
+            arr[i] = prefix + arr[i];
+        }
+
+        return arr;
+    }
+
     @Override
     public void runExperiment() throws Exception {
         for (String dataset : this.dataSets) {
             System.out.println("Experiment for \"" + dataset + "\":");
             MultiLabelInstances data;
-            /*
-            data = new MultiLabelInstances("datasets/" + dataset + ".arff",
-                    "datasets/" + dataset + ".xml");
-            */
+            int someFolds = 3;
+
+            DecimalFormat formatter = new DecimalFormat("#.########");
             FileInputStream fileStream;
             File arffFile = new File("datasets/" + dataset + ".arff");
             fileStream = new FileInputStream(arffFile);
@@ -236,38 +254,155 @@ public class UHLExperiment extends Experiment {
                     this.labelCounts.get(dataset),
                     labelsFirst);
 
-            System.out.println(data.getLabelsMetaData().getLabelNames());
-            System.out.println("label frequencies:");
-            System.out.println(Utils.arrayToString(LabelMetadata.getLabelFrequencies(data, labelsFirst)));
-
             if (data.getNumLabels() > 10) {
                 System.out.println("reduced labels to 10");
                 data = LabelSpaceReduction.reduceLabelSpace(data, 10, labelsFirst);
-
-                System.out.println("label frequencies (10 labels):");
-                System.out.println(Utils.arrayToString(LabelMetadata.getLabelFrequencies(data, labelsFirst)));
             }
+
+            Instances workingSet = new Instances(data.getDataSet());
+            PCC model = new PCC(this.inference);
+            model.setBaseClassifier(new Logistic());
+            String[] labelNames = new String[data.getLabelsMetaData().getLabelNames().size()];
+            data.getLabelsMetaData().getLabelNames().toArray(labelNames);
 
             this.initMeasures(data.getNumLabels());
-            System.out.println("labels:");
-            System.out.println(data.getNumLabels());
-            System.out.println("instances");
-            System.out.println(data.getNumInstances());
-            System.out.println("features");
-            System.out.println(data.getFeatureAttributes().size());
 
-            if (data.getNumInstances() >= 10000) {
-                System.out.println("2/3 train-test split");
-                Evaluation res = singleEvaluation(data, 33);
-                writeCSV(res.toCSV(), "results/results-" + dataset + ".csv");
-                System.out.println(res.toString());
-            } else {
-                System.out.println("3-fold cross validation");
-                MultipleEvaluation res = crossValidation(data, 3);
-                res.calculateStatistics();
-                writeCSV(res.toCSV(), "results/results-" + dataset + ".csv");
-                System.out.println(res.toString());
+            // FIXME: if doing ex post tau optimization, we should have another validation set for that
+            StringBuilder out = new StringBuilder(String.join(",",
+                    this.prependStringArr(labelNames, "pred_")) + ",fold,"
+                    + String.join(",", data.getLabelsMetaData().getLabelNames()) + '\n');
+
+            List<double[]> allConfidences = new ArrayList<double[]>();
+            List<double[]> allGroundTruth = new ArrayList<double[]>();
+
+            HashMap<String, List<Double>> results = new HashMap<>();
+
+            for(int i = 0; i < someFolds; ++i) {
+                try {
+                    int numLabels = data.getNumLabels();
+                    int numFeatures = data.getFeatureAttributes().size();
+
+                    Instances train = workingSet.trainCV(someFolds, i);
+                    Instances test = workingSet.testCV(someFolds, i);
+
+                    MultiLabelInstances mlTrain = new MultiLabelInstances(train, data.getLabelsMetaData());
+                    // MultiLabelInstances mlTest = new MultiLabelInstances(test, data.getLabelsMetaData());
+
+                    List<double[]> foldConfidences = new ArrayList<double[]>();
+                    List<double[]> foldGroundTruth = new ArrayList<double[]>();
+
+                    MultiLabelLearner clone = model.makeCopy();
+                    clone.build(mlTrain);
+
+                    for (int j = 0; j < test.numInstances(); j++) {
+                        Instance testInstance = test.instance(j);
+                        double[] inst = testInstance.toDoubleArray();
+                        MultiLabelOutput res = clone.makePrediction(testInstance);
+                        double[] confidences = res.getConfidences();
+                        allConfidences.add(confidences);
+                        foldConfidences.add(confidences);
+
+                        assert numLabels > 0;
+
+                        /* everything below is for writing the csv file with the confidences */
+                        for (double confidence : confidences) {
+                            // predicted labels (probability y_i = 1)
+                            out.append(formatter.format(confidence)).append(',');
+                        }
+
+                        // #fold
+                        out.append((new Integer(i)).toString()).append(',');
+
+                        // ground truth
+                        double[] groundTruth = new double[numLabels];
+                        for (int k = 0; k < numLabels; k++) {
+                            if (labelsFirst) {
+                                out.append(inst[k]);
+                                groundTruth[k] = inst[k];
+                            } else {
+                                out.append(inst[k + numFeatures]);
+                                groundTruth[k] = inst[k + numFeatures];
+                            }
+
+                            if (k < (numLabels - 1)) {
+                                out.append(",");
+                            }
+                        }
+                        allGroundTruth.add(groundTruth);
+                        foldGroundTruth.add(groundTruth);
+
+                        out.append('\n');
+                    }
+
+                    assert foldGroundTruth.size() > 0;
+
+                    // FIXME: UHL returning 0 all the time?
+                    if (this.measures.size() > 0) {
+                        for (Measure measure : this.measures) {
+                            measure.reset();
+
+                            for (int h = 0; h < foldConfidences.size(); h++) {
+                                /* the threshold is only applicable for hamming loss, subset 0/1 loss etc */
+                                MultiLabelOutput mlOutput = new MultiLabelOutput(foldConfidences.get(h), .5);
+                                MultiLabelOutput gt = new MultiLabelOutput(foldGroundTruth.get(h), .5);
+
+                                measure.update(mlOutput, new GroundTruth(gt.getBipartition()));
+                            }
+
+                            if (measure instanceof UncertainLoss) {
+                                System.out.print("# uncertainty ratio: ");
+                                double ucr = ((UncertainLoss) measure).getUncertainty();
+                                System.out.println(ucr);
+                            }
+                            String k = measure.getName();
+                            Double v = new Double(measure.getValue());
+
+                            if (results.containsKey(measure.getName())) {
+                                results.get(k).add(v);
+                            } else {
+                                List<Double> r = new ArrayList<Double>();
+                                r.add(v);
+                                results.put(k, r);
+                            }
+
+                            System.out.print(k);
+                            System.out.print(": ");
+                            System.out.println(v);
+                        }
+                    } else {
+                        // evaluation[i] = this.evaluate(clone, mlTest, mlTrain);
+                    }
+
+                } catch (Exception var14) {
+                    Logger.getLogger(Evaluator.class.getName()).log(Level.SEVERE, null, var14);
+                }
             }
+
+            System.out.println("# FINAL RESULTS");
+            for (String k : results.keySet()) {
+                Double[] d_values = new Double[someFolds];
+                results.get(k).toArray(d_values);
+                double[] values = ArrayUtils.toPrimitive(d_values);
+                Mean m = new Mean();
+                double mean = m.evaluate(values, 0, values.length);;
+                StandardDeviation sd = new StandardDeviation();
+
+                System.out.print(k);
+                System.out.print(": ");
+                System.out.print(mean);
+                System.out.print("+-");
+                System.out.println(sd.evaluate(values, mean));
+            }
+
+            /* save confidences of predictions (probabilistic predictions) to csv */
+            this.writeCSV(out.toString(), "results/predictions-" + dataset + ".csv");
+
+            // TODO: write result of tau optimization to csv with its losses
+            TauOptimization tOpt = new TauOptimization();
+            tOpt.setMeasures(this.measures);
+            double optTau = tOpt.tauGridSearch(allConfidences, allGroundTruth, new UncertainHammingLoss(), .5,true);
+            System.out.print(" /!\\ OPTIMAL TAU: ");
+            System.out.println(optTau);
         }
     }
 

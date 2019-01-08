@@ -6,6 +6,7 @@ import com.opencsv.CSVReader;
 import mulan.classifier.MultiLabelOutput;
 import mulan.evaluation.GroundTruth;
 import mulan.evaluation.measure.HammingLoss;
+import mulan.evaluation.measure.Measure;
 
 import java.io.FileReader;
 import java.util.ArrayList;
@@ -20,6 +21,8 @@ import java.util.List;
  * optimized for one set of confidences.
  */
 public class TauOptimization {
+    private List<Measure> measures;
+
 
     /**
      * This function tries to find an approximation of the optimal tau for a given loss/score function.
@@ -31,22 +34,31 @@ public class TauOptimization {
      *
      * @return approximately symmetric tau
      */
-    static double tauGridSearch(List<double[]> confidences, List<double[]> groundTruth, UncertainLoss measure, Boolean minimize) {
+    double tauGridSearch(List<double[]> confidences, List<double[]> groundTruth, UncertainLoss measure, double omega, Boolean minimize) {
         double noCandidates = 30;
         double start = .0;
         double end = .49999999;
         double step = (end - start) / noCandidates;
+        double optTau = 0;
+        double optValue = 1;
+        double optUncertainty = 0;
 
-        HammingLoss hl = new HammingLoss();
+        if (this.measures.size() > 0) {
+            for (Measure m : this.measures) {
+                m.reset();
+            }
+        }
 
         for (int i = 0; i < noCandidates; i++) {
             measure.reset();
             hl.reset();
             double tau = start + ((i + 1) * step);
+            /*
             System.out.print("-> tau := ");
             System.out.println(tau);
+            */
             measure.setTau(tau);
-            measure.setOmega(.5);
+            measure.setOmega(omega);
 
             for (int j = 0; j < confidences.size(); j++) {
                 MultiLabelOutput mlOutput = new MultiLabelOutput(confidences.get(j), .5);
@@ -55,15 +67,29 @@ public class TauOptimization {
                 hl.update(mlOutput, new GroundTruth(gt.getBipartition()));
             }
 
+            /*
             System.out.println(measure.toString());
             System.out.print("# uncertainty: ");
             System.out.println(measure.getUncertainty());
             System.out.print("# hamming loss: ");
             System.out.println(hl.toString());
+            */
+            /**
+             * using "<" allows us to use the *first* optimal value of the uncertain loss. it is indeed thinkable, that
+             * multiple equal values occur throughout the process. choosing the first one however, guarantees a bigger
+             * distance to 1/2 and thus creates a margin, hypothetically resulting in more abstentions.
+             */
+            if (measure.getValue() < optValue) {
+                optValue = measure.getValue();
+                optTau = tau;
+                optUncertainty = measure.getUncertainty();
+            }
         }
 
-        // FIXME: return tau for which measure is minimised
-        return .0;
+        System.out.println(optUncertainty);
+        System.out.println(optValue);
+
+        return optTau;
     }
 
     public static void main(String[] args) {
@@ -130,7 +156,13 @@ public class TauOptimization {
                 e.printStackTrace();
             }
 
-            double optTau = tauGridSearch(confidences, groundTruth, new UncertainHammingLoss(), true);
+            double optTau = tauGridSearch(confidences, groundTruth, new UncertainHammingLoss(), .5, true);
+            System.out.print(" /!\\ OPTIMAL TAU: ");
+            System.out.println(optTau);
         }
+    }
+
+    public void setMeasures(List<Measure> measures) {
+        this.measures = measures;
     }
 }
