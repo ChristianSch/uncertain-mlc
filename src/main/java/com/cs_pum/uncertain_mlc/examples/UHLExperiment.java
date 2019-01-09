@@ -272,8 +272,8 @@ public class UHLExperiment extends Experiment {
                     this.prependStringArr(labelNames, "pred_")) + ",fold,"
                     + String.join(",", data.getLabelsMetaData().getLabelNames()) + '\n');
 
-            List<double[]> allConfidences = new ArrayList<double[]>();
-            List<double[]> allGroundTruth = new ArrayList<double[]>();
+            List<List<double[]>> allConfidences = new ArrayList<>();
+            List<List<double[]>> allGroundTruth = new ArrayList<>();
 
             HashMap<String, List<Double>> results = new HashMap<>();
 
@@ -299,7 +299,7 @@ public class UHLExperiment extends Experiment {
                         double[] inst = testInstance.toDoubleArray();
                         MultiLabelOutput res = clone.makePrediction(testInstance);
                         double[] confidences = res.getConfidences();
-                        allConfidences.add(confidences);
+
                         foldConfidences.add(confidences);
 
                         assert numLabels > 0;
@@ -328,81 +328,103 @@ public class UHLExperiment extends Experiment {
                                 out.append(",");
                             }
                         }
-                        allGroundTruth.add(groundTruth);
+
                         foldGroundTruth.add(groundTruth);
 
                         out.append('\n');
                     }
 
+                    allGroundTruth.add(foldGroundTruth);
+                    allConfidences.add(foldConfidences);
+
                     assert foldGroundTruth.size() > 0;
-
-                    // FIXME: UHL returning 0 all the time?
-                    if (this.measures.size() > 0) {
-                        for (Measure measure : this.measures) {
-                            measure.reset();
-
-                            for (int h = 0; h < foldConfidences.size(); h++) {
-                                /* the threshold is only applicable for hamming loss, subset 0/1 loss etc */
-                                MultiLabelOutput mlOutput = new MultiLabelOutput(foldConfidences.get(h), .5);
-                                MultiLabelOutput gt = new MultiLabelOutput(foldGroundTruth.get(h), .5);
-
-                                measure.update(mlOutput, new GroundTruth(gt.getBipartition()));
-                            }
-
-                            if (measure instanceof UncertainLoss) {
-                                System.out.print("# uncertainty ratio: ");
-                                double ucr = ((UncertainLoss) measure).getUncertainty();
-                                System.out.println(ucr);
-                            }
-                            String k = measure.getName();
-                            Double v = new Double(measure.getValue());
-
-                            if (results.containsKey(measure.getName())) {
-                                results.get(k).add(v);
-                            } else {
-                                List<Double> r = new ArrayList<Double>();
-                                r.add(v);
-                                results.put(k, r);
-                            }
-
-                            System.out.print(k);
-                            System.out.print(": ");
-                            System.out.println(v);
-                        }
-                    } else {
-                        // evaluation[i] = this.evaluate(clone, mlTest, mlTrain);
-                    }
 
                 } catch (Exception var14) {
                     Logger.getLogger(Evaluator.class.getName()).log(Level.SEVERE, null, var14);
                 }
             }
 
-            System.out.println("# FINAL RESULTS");
-            for (String k : results.keySet()) {
-                Double[] d_values = new Double[someFolds];
-                results.get(k).toArray(d_values);
-                double[] values = ArrayUtils.toPrimitive(d_values);
-                Mean m = new Mean();
-                double mean = m.evaluate(values, 0, values.length);;
-                StandardDeviation sd = new StandardDeviation();
-
-                System.out.print(k);
-                System.out.print(": ");
-                System.out.print(mean);
-                System.out.print("+-");
-                System.out.println(sd.evaluate(values, mean));
-            }
-
             /* save confidences of predictions (probabilistic predictions) to csv */
             this.writeCSV(out.toString(), "results/predictions-" + dataset + ".csv");
 
             // TODO: write result of tau optimization to csv with its losses
+            // now the
             TauOptimization tOpt = new TauOptimization();
             tOpt.setMeasures(this.measures);
-            double optTau = tOpt.tauGridSearch(allConfidences, allGroundTruth, new UncertainHammingLoss(), .5,true);
+            List<double[]> confidences = new ArrayList<>();
+            List<double[]> groundTruth = new ArrayList<>();
+
+            for (List<double[]> confs : allConfidences) {
+                for (int i = 0; i < confs.size(); i++) {
+                    confidences.add(confs.get(i));
+                }
+            }
+
+            for (List<double[]> grounds : allGroundTruth) {
+                for (int i = 0; i < grounds.size(); i++) {
+                    groundTruth.add(grounds.get(i));
+                }
+            }
+
+            double optTau = tOpt.tauGridSearch(confidences, groundTruth, new UncertainHammingLoss(), .5,true);
             System.out.print(" /!\\ OPTIMAL TAU: ");
             System.out.println(optTau);
+
+            // FIXME: UHL returning 0 all the time?
+            if (this.measures.size() > 0) {
+                for (Measure measure : this.measures) {
+                    measure.reset();
+                    String k = measure.getName();
+
+                    if (measure instanceof UncertainHammingLoss) {
+                        ((UncertainHammingLoss) measure).setTau(optTau);
+                    }
+
+                    for (int j = 0; j < allConfidences.size(); j++) {
+                        List<double[]> foldConfidences = allConfidences.get(j);
+                        List<double[]> foldGroundTruth = allGroundTruth.get(j);
+
+                        for (int h = 0; h < foldConfidences.size(); h++) {
+                            /* the threshold is only applicable for hamming loss, subset 0/1 loss etc */
+                            MultiLabelOutput mlOutput = new MultiLabelOutput(foldConfidences.get(h), .5);
+                            MultiLabelOutput gt = new MultiLabelOutput(foldGroundTruth.get(h), .5);
+
+                            measure.update(mlOutput, new GroundTruth(gt.getBipartition()));
+                        }
+
+                        if (measure instanceof UncertainLoss) {
+                            System.out.print("# uncertainty ratio: ");
+                            double ucr = ((UncertainLoss) measure).getUncertainty();
+                            System.out.println(ucr);
+                        }
+
+                        Double v = new Double(measure.getValue());
+
+                        if (results.containsKey(k)) {
+                            results.get(k).add(v);
+                        } else {
+                            List<Double> r = new ArrayList<Double>();
+                            r.add(v);
+                            results.put(k, r);
+                        }
+                    }
+
+                    Double[] d_values = new Double[someFolds];
+                    results.get(k).toArray(d_values);
+                    double[] values = ArrayUtils.toPrimitive(d_values);
+                    Mean m = new Mean();
+                    double mean = m.evaluate(values, 0, values.length);
+                    StandardDeviation sd = new StandardDeviation();
+
+                    System.out.print(k);
+                    System.out.print(": ");
+                    System.out.print(mean);
+                    System.out.print("+-");
+                    System.out.println(sd.evaluate(values, mean));
+                }
+            } else {
+                // evaluation[i] = this.evaluate(clone, mlTest, mlTrain);
+            }
         }
     }
 
