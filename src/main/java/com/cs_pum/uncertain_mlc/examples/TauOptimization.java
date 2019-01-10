@@ -43,7 +43,7 @@ public class TauOptimization {
         double optValue = 1;
         double optUncertainty = 0;
 
-        if (this.measures.size() > 0) {
+        if (this.measures != null && this.measures.size() > 0) {
             for (Measure m : this.measures) {
                 m.reset();
             }
@@ -63,13 +63,18 @@ public class TauOptimization {
                 MultiLabelOutput mlOutput = new MultiLabelOutput(confidences.get(j), .5);
                 MultiLabelOutput gt = new MultiLabelOutput(groundTruth.get(j), .5);
                 measure.update(mlOutput, new GroundTruth(gt.getBipartition()));
+
+                if (this.measures != null) {
+                    for (Measure m : this.measures) {
+                        m.update(mlOutput, new GroundTruth(gt.getBipartition()));
+                    }
+                }
             }
 
             /*
             System.out.println(measure.toString());
             System.out.print("# uncertainty: ");
             System.out.println(measure.getUncertainty());
-            System.out.print("# hamming loss: ");
             */
             /**
              * using "<" allows us to use the *first* optimal value of the uncertain loss. it is indeed thinkable, that
@@ -154,7 +159,8 @@ public class TauOptimization {
             }
 
             /*
-            double optTau = tauGridSearch(confidences, groundTruth, new UncertainHammingLoss(), .5, true);
+            TauOptimization tauOpt = new TauOptimization();
+            double optTau = tauOpt.tauGridSearch(confidences, groundTruth, new UncertainHammingLoss(), .5, true);
             System.out.print(" /!\\ OPTIMAL TAU: ");
             System.out.println(optTau);
             */
