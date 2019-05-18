@@ -7,6 +7,7 @@ import mulan.classifier.MultiLabelOutput;
 import mulan.evaluation.GroundTruth;
 import mulan.evaluation.measure.HammingLoss;
 import mulan.evaluation.measure.Measure;
+import put.mlc.measures.ZeroOneLossMeasure;
 
 import java.io.FileReader;
 import java.util.ArrayList;
@@ -37,7 +38,7 @@ public class TauOptimization {
     double tauGridSearch(List<double[]> confidences, List<double[]> groundTruth, UncertainLoss measure, double omega, Boolean minimize) {
         double noCandidates = 30;
         double start = .0;
-        double end = .49999999;
+        double end = .5;
         double step = (end - start) / noCandidates;
         double optTau = 0;
         double optValue = 1;
@@ -52,10 +53,8 @@ public class TauOptimization {
         for (int i = 0; i < noCandidates; i++) {
             measure.reset();
             double tau = start + ((i + 1) * step);
-            /*
             System.out.print("-> tau := ");
             System.out.println(tau);
-            */
             measure.setTau(tau);
             measure.setOmega(omega);
 
@@ -65,12 +64,10 @@ public class TauOptimization {
                 measure.update(mlOutput, new GroundTruth(gt.getBipartition()));
             }
 
-            /*
             System.out.println(measure.toString());
             System.out.print("# uncertainty: ");
             System.out.println(measure.getUncertainty());
             System.out.print("# hamming loss: ");
-            */
             /**
              * using "<" allows us to use the *first* optimal value of the uncertain loss. it is indeed thinkable, that
              * multiple equal values occur throughout the process. choosing the first one however, guarantees a bigger
@@ -153,11 +150,15 @@ public class TauOptimization {
                 e.printStackTrace();
             }
 
-            /*
-            double optTau = tauGridSearch(confidences, groundTruth, new UncertainHammingLoss(), .5, true);
+            TauOptimization tOpt = new TauOptimization();
+            List<Measure> measures = new ArrayList<Measure>();
+            measures.add(new HammingLoss());
+            measures.add(new UncertainHammingLoss(1./3, 1./2));
+            measures.add(new ZeroOneLossMeasure());
+            tOpt.setMeasures(measures);
+            double optTau = tOpt.tauGridSearch(confidences, groundTruth, new UncertainHammingLoss(), .5, true);
             System.out.print(" /!\\ OPTIMAL TAU: ");
             System.out.println(optTau);
-            */
         }
     }
 
