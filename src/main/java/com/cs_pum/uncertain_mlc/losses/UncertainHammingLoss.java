@@ -54,8 +54,8 @@ public class UncertainHammingLoss implements UncertainLoss {
     }
 
     public void setOmega(double omega) {
-        if (omega <= 0. || omega > 1.0) {
-            throw new IllegalArgumentException("Omega needs to be > 0. and <= 1.0");
+        if (omega <= 0. || omega > 0.5) {
+            throw new IllegalArgumentException("Omega needs to be > 0. and <= 0.5");
         }
 
         this.omega = omega;
