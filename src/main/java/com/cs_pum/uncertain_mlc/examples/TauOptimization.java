@@ -37,7 +37,7 @@ public class TauOptimization {
     double tauGridSearch(List<double[]> confidences, List<double[]> groundTruth, UncertainLoss measure, double omega, Boolean minimize) {
         double noCandidates = 30;
         double start = .0;
-        double end = .49999999;
+        double end = .5;
         double step = (end - start) / noCandidates;
         double optTau = 0;
         double optValue = 1;
@@ -96,9 +96,10 @@ public class TauOptimization {
 
     public static void main(String[] args) {
         String[] predictionFiles = {
+                /*
                 "results/predictions-emotions.csv",
-                "results/predictions-IMDB-F.csv",
-                "results/predictions-medical.csv",
+                "results/predictions-IMDB-F.csv",*/
+                "results/predictions-medical.csv",/*
                 "results/predictions-REUTERS-K500-EX2.csv",
                 "results/predictions-SLASHDOT-F.csv",
                 "results/predictions-yeast.csv",
@@ -106,7 +107,7 @@ public class TauOptimization {
                 "results/predictions-mediamill.csv",
                 "results/predictions-OHSUMED-F.csv",
                 "results/predictions-scene.csv",
-                "results/predictions-tmc2007-500.csv"
+                "results/predictions-tmc2007-500.csv"*/
         };
 
         for (String fileName : predictionFiles) {
@@ -158,12 +159,10 @@ public class TauOptimization {
                 e.printStackTrace();
             }
 
-            /*
             TauOptimization tauOpt = new TauOptimization();
             double optTau = tauOpt.tauGridSearch(confidences, groundTruth, new UncertainHammingLoss(), .5, true);
             System.out.print(" /!\\ OPTIMAL TAU: ");
             System.out.println(optTau);
-            */
         }
     }
 

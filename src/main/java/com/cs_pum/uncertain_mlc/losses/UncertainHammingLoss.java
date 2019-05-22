@@ -42,8 +42,8 @@ public class UncertainHammingLoss implements UncertainLoss {
     }
 
     public void setTau(double tau) {
-        if (tau <= 0 || tau >= .5) {
-            throw new IllegalArgumentException("Tau needs to be > 0. and < 0.5");
+        if (tau <= 0 || tau > .5) {
+            throw new IllegalArgumentException("Tau needs to be > 0. and <= 0.5");
         }
 
         this.tau = tau;

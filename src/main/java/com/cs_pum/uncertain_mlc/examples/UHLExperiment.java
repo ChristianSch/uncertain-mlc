@@ -1,32 +1,26 @@
 package com.cs_pum.uncertain_mlc.examples;
 
-import java.io.*;
-import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import com.cs_pum.uncertain_mlc.common.LabelMetadata;
 import com.cs_pum.uncertain_mlc.common.LabelSpaceReduction;
 import com.cs_pum.uncertain_mlc.losses.UncertainHammingLoss;
-
 import com.cs_pum.uncertain_mlc.losses.UncertainLoss;
 import mulan.classifier.MultiLabelLearner;
 import mulan.classifier.MultiLabelOutput;
 import mulan.data.InvalidDataFormatException;
 import mulan.data.MultiLabelInstances;
-import mulan.evaluation.Evaluator;
 import mulan.evaluation.Evaluation;
+import mulan.evaluation.Evaluator;
 import mulan.evaluation.GroundTruth;
 import mulan.evaluation.MultipleEvaluation;
 import mulan.evaluation.measure.HammingLoss;
 import mulan.evaluation.measure.Measure;
-
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
+import put.mlc.classifiers.pcc.PCC;
+import put.mlc.classifiers.pcc.inference.ExhaustiveInference;
+import put.mlc.classifiers.pcc.inference.Inference;
+import put.mlc.examples.common.Experiment;
+import put.mlc.measures.ZeroOneLossMeasure;
 import weka.classifiers.functions.Logistic;
 import weka.core.Instance;
 import weka.core.Instances;
@@ -34,11 +28,16 @@ import weka.core.Utils;
 import weka.filters.unsupervised.instance.Randomize;
 import weka.filters.unsupervised.instance.RemovePercentage;
 
-import put.mlc.classifiers.pcc.PCC;
-import put.mlc.classifiers.pcc.inference.Inference;
-import put.mlc.classifiers.pcc.inference.ExhaustiveInference;
-import put.mlc.examples.common.Experiment;
-import put.mlc.measures.ZeroOneLossMeasure;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 
 /**
@@ -46,7 +45,7 @@ import put.mlc.measures.ZeroOneLossMeasure;
  * the uncertainty based hamming loss.
  *
  * @author Christian Schulze
- * @since  2018-06-25
+ * @since 2018-06-25
  */
 public class UHLExperiment extends Experiment {
     Inference inference;
@@ -101,13 +100,8 @@ public class UHLExperiment extends Experiment {
     public void initMeasures(int numOfLabels) {
         this.measures = new ArrayList<Measure>();
         this.measures.add(new HammingLoss());
-        this.measures.add(new UncertainHammingLoss(1./3, 1./2));
+        this.measures.add(new UncertainHammingLoss(1. / 3, 1. / 3));
         this.measures.add(new ZeroOneLossMeasure());
-        /*
-        this.measures.add(new InstanceBasedFMeasure());
-        this.measures.add(new MicroFMeasure(numOfLabels));
-        this.measures.add(new MacroFMeasure(numOfLabels));
-        */
     }
 
     /**
@@ -267,7 +261,6 @@ public class UHLExperiment extends Experiment {
 
             this.initMeasures(data.getNumLabels());
 
-            // FIXME: if doing ex post tau optimization, we should have another validation set for that
             StringBuilder out = new StringBuilder(String.join(",",
                     this.prependStringArr(labelNames, "pred_")) + ",fold,"
                     + String.join(",", data.getLabelsMetaData().getLabelNames()) + '\n');
@@ -277,7 +270,9 @@ public class UHLExperiment extends Experiment {
 
             HashMap<String, List<Double>> results = new HashMap<>();
 
-            for(int i = 0; i < someFolds; ++i) {
+            for (int i = 0; i < someFolds; ++i) {
+                System.out.println("fold: s" + i);
+
                 try {
                     int numLabels = data.getNumLabels();
                     int numFeatures = data.getFeatureAttributes().size();
@@ -334,6 +329,62 @@ public class UHLExperiment extends Experiment {
                         out.append('\n');
                     }
 
+                    // add the approx. optimal tau to the dictionary
+                    TauOptimization tOpt = new TauOptimization();
+                    double optTau = tOpt.tauGridSearch(foldConfidences, foldGroundTruth,
+                            new UncertainHammingLoss(), .5, true);
+
+                    if (results.containsKey("tau")) {
+                        results.get("tau").add(optTau);
+                    } else {
+                        ArrayList<Double> l = new ArrayList<>();
+                        l.add(optTau);
+                        results.put("tau", l);
+                    }
+
+                    // add measures for the current fold to the dictionary
+                    for (Measure measure : this.measures) {
+                        measure.reset();
+                        String k = measure.getName();
+                        System.out.println("adding measure");
+                        System.out.println(k);
+
+                        if (measure instanceof UncertainHammingLoss) {
+                            ((UncertainHammingLoss) measure).setTau(optTau);
+                            ((UncertainHammingLoss) measure).setOmega(1./3);
+                        }
+
+                        for (int h = 0; h < foldConfidences.size(); h++) {
+                            /* the threshold is only applicable for hamming loss, subset 0/1 loss etc */
+                            MultiLabelOutput mlOutput = new MultiLabelOutput(foldConfidences.get(h), .5);
+                            MultiLabelOutput gt = new MultiLabelOutput(foldGroundTruth.get(h), .5);
+
+                            measure.update(mlOutput, new GroundTruth(gt.getBipartition()));
+                        }
+
+                        if (measure instanceof UncertainLoss) {
+                            double ucr = ((UncertainLoss) measure).getUncertainty();
+
+                            if (results.containsKey(k + " - uncertainty")) {
+                                results.get(k + " - uncertainty").add(ucr);
+                            } else {
+                                ArrayList<Double> l = new ArrayList<>();
+                                l.add(ucr);
+                                results.put(k + " - uncertainty", l);
+                            }
+                        }
+
+                        Double v = new Double(measure.getValue());
+
+                        if (results.containsKey(k)) {
+                            results.get(k).add(v);
+                        } else {
+                            List<Double> r = new ArrayList<Double>();
+                            r.add(v);
+                            results.put(k, r);
+                        }
+                    }
+
                     allGroundTruth.add(foldGroundTruth);
                     allConfidences.add(foldConfidences);
 
@@ -344,13 +395,32 @@ public class UHLExperiment extends Experiment {
                 }
             }
 
-            /* save confidences of predictions (probabilistic predictions) to csv */
+            // post-process measures that have been obtained fold-wise
+            for (String k : results.keySet()) {
+                System.out.println(k);
+                Double[] d_values = new Double[someFolds];
+                results.get(k).toArray(d_values);
+                double[] values = ArrayUtils.toPrimitive(d_values);
+                Mean m = new Mean();
+                double mean = m.evaluate(values, 0, values.length);
+                StandardDeviation sd = new StandardDeviation();
+
+                System.out.print(k);
+                System.out.print(": ");
+                System.out.print(mean);
+                System.out.print("+-");
+                System.out.println(sd.evaluate(values, mean));
+            }
+
+            System.out.println("---------------------------------");
+
+            /* save confidences (probabilistic predictions) to csv */
             this.writeCSV(out.toString(), "results/predictions-" + dataset + ".csv");
 
+            // evaluate measures on whole dataset
             // TODO: write result of tau optimization to csv with its losses
-            // now the
             TauOptimization tOpt = new TauOptimization();
-            tOpt.setMeasures(this.measures);
+
             List<double[]> confidences = new ArrayList<>();
             List<double[]> groundTruth = new ArrayList<>();
 
@@ -366,15 +436,18 @@ public class UHLExperiment extends Experiment {
                 }
             }
 
-            double optTau = tOpt.tauGridSearch(confidences, groundTruth, new UncertainHammingLoss(), .5,true);
+            /*
+            double optTau = tOpt.tauGridSearch(confidences, groundTruth, new UncertainHammingLoss(), 1./3, true);
             System.out.print(" /!\\ OPTIMAL TAU: ");
             System.out.println(optTau);
 
-            // FIXME: UHL returning 0 all the time?
             if (this.measures.size() > 0) {
                 for (Measure measure : this.measures) {
                     measure.reset();
                     String k = measure.getName();
+
+                    System.out.println("processing measure:");
+                    System.out.println(k);
 
                     if (measure instanceof UncertainHammingLoss) {
                         ((UncertainHammingLoss) measure).setTau(optTau);
@@ -385,7 +458,7 @@ public class UHLExperiment extends Experiment {
                         List<double[]> foldGroundTruth = allGroundTruth.get(j);
 
                         for (int h = 0; h < foldConfidences.size(); h++) {
-                            /* the threshold is only applicable for hamming loss, subset 0/1 loss etc */
+                            /-* the threshold is only applicable for hamming loss, subset 0/1 loss etc *-/
                             MultiLabelOutput mlOutput = new MultiLabelOutput(foldConfidences.get(h), .5);
                             MultiLabelOutput gt = new MultiLabelOutput(foldGroundTruth.get(h), .5);
 
@@ -409,8 +482,11 @@ public class UHLExperiment extends Experiment {
                         }
                     }
 
+                    System.out.println("evaluating measure");
                     Double[] d_values = new Double[someFolds];
                     results.get(k).toArray(d_values);
+                    System.out.println(results.get(k));
+                    System.out.println(Utils.arrayToString(d_values));
                     double[] values = ArrayUtils.toPrimitive(d_values);
                     Mean m = new Mean();
                     double mean = m.evaluate(values, 0, values.length);
@@ -425,6 +501,7 @@ public class UHLExperiment extends Experiment {
             } else {
                 // evaluation[i] = this.evaluate(clone, mlTest, mlTrain);
             }
+            */
         }
     }
 
