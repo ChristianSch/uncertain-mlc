@@ -7,6 +7,7 @@ import mulan.classifier.MultiLabelOutput;
 import mulan.evaluation.GroundTruth;
 import mulan.evaluation.measure.HammingLoss;
 import mulan.evaluation.measure.Measure;
+import put.mlc.measures.ZeroOneLossMeasure;
 
 import java.io.FileReader;
 import java.util.ArrayList;
@@ -52,10 +53,8 @@ public class TauOptimization {
         for (int i = 0; i < noCandidates; i++) {
             measure.reset();
             double tau = start + ((i + 1) * step);
-            /*
             System.out.print("-> tau := ");
             System.out.println(tau);
-            */
             measure.setTau(tau);
             measure.setOmega(omega);
 
@@ -71,11 +70,9 @@ public class TauOptimization {
                 }
             }
 
-            /*
             System.out.println(measure.toString());
             System.out.print("# uncertainty: ");
             System.out.println(measure.getUncertainty());
-            */
             /**
              * using "<" allows us to use the *first* optimal value of the uncertain loss. it is indeed thinkable, that
              * multiple equal values occur throughout the process. choosing the first one however, guarantees a bigger
@@ -160,6 +157,11 @@ public class TauOptimization {
             }
 
             TauOptimization tauOpt = new TauOptimization();
+            List<Measure> measures = new ArrayList<Measure>();
+            measures.add(new HammingLoss());
+            measures.add(new UncertainHammingLoss(1./3, 1./2));
+            measures.add(new ZeroOneLossMeasure());
+            tauOpt.setMeasures(measures);
             double optTau = tauOpt.tauGridSearch(confidences, groundTruth, new UncertainHammingLoss(), .5, true);
             System.out.print(" /!\\ OPTIMAL TAU: ");
             System.out.println(optTau);
